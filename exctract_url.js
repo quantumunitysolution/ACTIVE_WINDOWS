@@ -3,8 +3,10 @@ const path = require("path");
 const sqlite3 = require("sqlite3");
 const os = require("os");
 const activeWindow = require("active-win");
-const chromeUserData = path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data");
-const localStatePath = path.join(chromeUserData, "Local State");
+const setupDefaultPaths = require("./history_path");
+const stringFilter = require("./string_filteration")
+let chromeUserData = path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data");
+let localStatePath = path.join(chromeUserData, "Local State");
 
 function readHistory(tempPath) {
     return new Promise((resolve) => {
@@ -30,7 +32,7 @@ function readHistory(tempPath) {
 function matchActiveTitleToHistory(history, currentApp, profile) {
     let historyMatches = [];
     for (const h of history) {
-        const stringResult = compareStrings(currentApp.title.toLowerCase().trim(), h.title || "", h.url);
+        const stringResult = stringFilter.compareStrings(currentApp.title.toLowerCase().trim(), h.title || "", h.url);
         if (stringResult.isMatch) {
             historyMatches.push(stringResult);
         }
@@ -38,7 +40,7 @@ function matchActiveTitleToHistory(history, currentApp, profile) {
 
     if (historyMatches.length > 0) {
         let foundedApp = currentApp;
-        foundedApp['historyMatches'] = getTopElementByDetails(historyMatches);
+        foundedApp['historyMatches'] = stringFilter.getTopElementByDetails(historyMatches);
         foundedApp['profile'] = profile;
         return foundedApp;
     } else {
@@ -52,6 +54,7 @@ const createPaths = async (currentApp) => {
         const localState = JSON.parse(raw);
         const lastActive = localState?.profile?.last_active_profiles;
         const lastUsedProfile = localState?.profile?.last_used;
+        console.log(lastActive, lastUsedProfile);
         let results = [];
         if (Array.isArray(lastActive) && lastActive.length > 0) {
             const tempPaths = lastActive.map((profile) => {
@@ -118,17 +121,50 @@ function saveResult(data) {
     }
 }
 
-// setInterval(async () => {
-//     console.log("\n\n------------- Checking -------------")
-//     const currentApplication = activeWindow.sync();
-//     if (!currentApplication) return;
-//     if (
-//         currentApplication.owner.path.toLowerCase().includes("chrome") ||
-//         currentApplication.owner.path.toLowerCase().includes("edge") ||
-//         currentApplication.owner.path.toLowerCase().includes("brave")
-//     ) {
-//         const findApplication = await createPaths(currentApplication);
-//         console.log(findApplication)
-//     }
-//     console.log("------------- End -------------")
-// }, 5000)
+function applicationName(path, browserPaths) {
+    let currentApplication = "";
+    if (path.toLowerCase().includes("chrome")) {
+        currentApplication = browserPaths.chrome;
+    } else if (path.toLowerCase().includes("edge")) {
+        currentApplication = browserPaths.edge;
+    } else if (path.toLowerCase().includes("brave")) {
+        currentApplication = browserPaths.brave;
+    } else if (path.toLowerCase().includes("vivaldi")) {
+        currentApplication = browserPaths.vivaldi;
+    } else if (path.toLowerCase().includes("seamonkey")) {
+        currentApplication = browserPaths.seamonkey;
+    } else if (path.toLowerCase().includes("torch")) {
+        currentApplication = browserPaths.torch;
+    } else if (path.toLowerCase().includes("opera")) {
+        currentApplication = browserPaths.opera;
+    } else if (path.toLowerCase().includes("firefox")) {
+        currentApplication = browserPaths.firefox;
+    } else if (path.toLowerCase().includes("avast")) {
+        currentApplication = browserPaths.avast;
+    } else {
+        currentApplication = false;
+    }
+    return currentApplication;
+}
+
+setInterval(async () => {
+    console.log("\n\n------------- Checking -------------")
+    const currentApplication = activeWindow.sync();
+    if (!currentApplication) return;
+
+    if (
+        currentApplication.owner.path.toLowerCase().includes("chrome") ||
+        currentApplication.owner.path.toLowerCase().includes("edge") ||
+        currentApplication.owner.path.toLowerCase().includes("brave")
+    ) {
+        if (applicationName(currentApplication.owner.path, setupDefaultPaths.setupDefaultPaths()) != false) {
+            let browserPath = applicationName(currentApplication.owner.path, setupDefaultPaths.setupDefaultPaths());
+            chromeUserData = path.join(browserPath, "User Data");
+            localStatePath = path.join(chromeUserData, "Local State");
+            console.log(chromeUserData)
+            const findApplication = await createPaths(currentApplication);
+            console.log(findApplication)
+        }
+    }
+    console.log("------------- End -------------")
+}, 5000)
