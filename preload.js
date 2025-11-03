@@ -12,8 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Request current live data on demand
-  getLiveData: () => ipcRenderer.invoke('get-live-data')
-  ,
+  getLiveData: () => ipcRenderer.invoke('get-live-data'),
+  
+  // Store operations
+  storeSetData: (key, data) => ipcRenderer.invoke('store-set-data', { key, data }),
+  storeGetData: (key) => ipcRenderer.invoke('store-get-data', key),
   // Open an external URL in the default browser (main process will handle)
   openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });

@@ -1,33 +1,42 @@
 const fs = require("fs");
 const path = require("path");
-const sqlite3 = require("sqlite3");
+const Database = require('better-sqlite3');
 const os = require("os");
 const activeWindow = require("active-win");
 const setupDefaultPaths = require("./history_path");
-const stringFilter = require("./string_filteration")
+const stringFilter = require("./string_filteration");
+const Store = require('electron-store');
+
+const store = new Store();
 let chromeUserData = path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data");
 let localStatePath = path.join(chromeUserData, "Local State");
 
 function readHistory(tempPath) {
     return new Promise((resolve) => {
-        const db = new sqlite3.Database(tempPath, sqlite3.OPEN_READONLY);
-        const query = `
-                    SELECT 
-                        urls.url AS url,
-                        urls.title AS title,
-                        datetime((urls.last_visit_time / 1000000) - 11644473600, 'unixepoch') AS last_visit
-                    FROM urls
-                    WHERE datetime((urls.last_visit_time / 1000000) - 11644473600, 'unixepoch') > datetime('now', '-24 hours')
-                    ORDER BY urls.last_visit_time DESC
+        try {
+            const db = new Database(tempPath, { readonly: true });
+            const query = `
+                SELECT 
+                urls.url AS url,
+                urls.title AS title,
+                datetime((urls.last_visit_time / 1000000) - 11644473600, 'unixepoch') AS last_visit
+                FROM urls
+                WHERE datetime((urls.last_visit_time / 1000000) - 11644473600, 'unixepoch') > datetime('now', '-24 hours')
+                ORDER BY urls.last_visit_time DESC
             `;
 
-        db.all(query, (err, rows) => {
+            const stmt = db.prepare(query);
+            const rows = stmt.all(); // synchronous
             db.close();
-            if (err) return resolve([]);
+
             resolve(rows);
-        });
+        } catch (err) {
+            console.error('Error reading history:', err);
+            resolve([]);
+        }
     });
 }
+
 
 function matchActiveTitleToHistory(history, currentApp, profile) {
     let historyMatches = [];
@@ -98,24 +107,20 @@ function saveResult(data) {
         if (!data) {
             return;
         }
-        // Step 1: Get today's date and file path
-        const today = new Date().toISOString().slice(0, 10); // e.g. '2025-10-31'
-        const filePath = path.join(__dirname, `${today}.json`);
+        // Get today's date as the key
+        const today = new Date().toISOString().slice(0, 10);
+        const key = `data.${today}`;
 
-        // Step 2: Read existing data (if file exists)
-        let existingData = [];
-        if (fs.existsSync(filePath)) {
-            const fileContent = fs.readFileSync(filePath, 'utf-8');
-            existingData = JSON.parse(fileContent || '[]');
-        }
+        // Get existing data from store
+        let existingData = store.get(key, []);
 
-        // Step 3: Append new data
+        // Append new data
         existingData.push(data);
 
-        // Step 4: Write back to file
-        fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2), 'utf-8');
+        // Save back to store
+        store.set(key, existingData);
 
-        console.log(`✅ Data saved to ${filePath}`);
+        console.log(`✅ Data saved to store for ${today}`);
     } catch (err) {
         console.error('❌ Error saving data:', err);
     }
@@ -150,6 +155,7 @@ function applicationName(path, browserPaths) {
 setInterval(async () => {
     console.log("\n\n------------- Checking -------------")
     const currentApplication = activeWindow.sync();
+    console.log("current", currentApplication)
     if (!currentApplication) return;
     if (currentApplication?.owner.path) {
         if (applicationName(currentApplication.owner.path, setupDefaultPaths.setupDefaultPaths()) != false) {

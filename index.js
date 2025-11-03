@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const Store = require('electron-store');
 
+const store = new Store();
 let mainWindow;
 
 function createWindow() {
@@ -32,36 +33,27 @@ function createWindow() {
         }
     });
 
-// --- Live JSON data watcher ---
-// Watches JSON files saved by `exctract_url.js` (files named YYYY-MM-DD.json in the app dir)
-// and sends their parsed contents to renderer via 'live-data' IPC channel when they change.
+// --- Live data watcher ---
+// Watches store data and sends updates to renderer via 'live-data' IPC channel
 function setupLiveJsonWatcher(pollInterval = 2000) {
-    let lastMtime = 0;
+    let lastData = null;
 
     async function checkAndSend() {
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-        const filePath = path.join(__dirname, `${today}.json`);
-
+        const key = `data.${today}`;
+        
         try {
-            const stat = fs.statSync(filePath);
-            if (stat.mtimeMs !== lastMtime) {
-                lastMtime = stat.mtimeMs;
-                const content = fs.readFileSync(filePath, 'utf8');
-                let parsed = [];
-                try {
-                    parsed = JSON.parse(content || '[]');
-                } catch (err) {
-                    console.warn('live-json: failed to parse JSON', err);
-                }
-
+            const currentData = store.get(key, []);
+            if (JSON.stringify(currentData) !== JSON.stringify(lastData)) {
+                lastData = currentData;
                 if (mainWindow && mainWindow.webContents) {
-                    mainWindow.webContents.send('live-data', parsed);
+                    mainWindow.webContents.send('live-data', currentData);
                 }
             }
         } catch (err) {
-            // File may not exist yet — if previously had data, reset and notify empty
-            if (lastMtime !== 0) {
-                lastMtime = 0;
+            console.warn('live-data: failed to get data from store', err);
+            if (lastData !== null) {
+                lastData = null;
                 if (mainWindow && mainWindow.webContents) {
                     mainWindow.webContents.send('live-data', []);
                 }
@@ -90,19 +82,34 @@ ipcMain.handle('ping', () => {
     return 'pong from main process';
 });
 
-// provide a handler so renderer can ask for the current live data on demand
+// provide handlers for store operations
 ipcMain.handle('get-live-data', async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const filePath = path.join(__dirname, `${today}.json`);
     try {
-        if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return JSON.parse(content || '[]');
-        }
+        return store.get(`data.${today}`, []);
     } catch (err) {
         console.warn('get-live-data error', err);
+        return [];
     }
-    return [];
+});
+
+ipcMain.handle('store-set-data', async (event, { key, data }) => {
+    try {
+        store.set(key, data);
+        return true;
+    } catch (err) {
+        console.warn('store-set-data error', err);
+        return false;
+    }
+});
+
+ipcMain.handle('store-get-data', async (event, key) => {
+    try {
+        return store.get(key);
+    } catch (err) {
+        console.warn('store-get-data error', err);
+        return null;
+    }
 });
 
 // Open external URL in default browser
