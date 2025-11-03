@@ -7,13 +7,13 @@ function setupForWindows() {
 
     const appDataDirectory = Path.join(process.env.HOMEDRIVE, "Users", process.env.USERNAME, "AppData");
 
-    defaultPaths.chrome = Path.join(appDataDirectory, "Local", "Google", "Chrome");
-    defaultPaths.avast = Path.join(appDataDirectory, "Local", "Google", "AVAST Software");
-    defaultPaths.firefox = Path.join(appDataDirectory, "Roaming", "Mozilla", "Firefox");
-    defaultPaths.opera = Path.join(appDataDirectory, "Roaming", "Opera Software");
-    defaultPaths.edge = Path.join(appDataDirectory, "Local", "Microsoft", "Edge");
+    defaultPaths.chrome = Path.join(appDataDirectory, "Local", "Google", "Chrome", "User Data");
+    defaultPaths.avast = Path.join(appDataDirectory, "Local", "Google", "AVAST Software", "User Data");
+    defaultPaths.firefox = Path.join(appDataDirectory, "Roaming", "Mozilla", "Firefox", "User Data");
+    defaultPaths.opera = Path.join(appDataDirectory, "Roaming", "Opera Software", "Opera Stable");
+    defaultPaths.edge = Path.join(appDataDirectory, "Local", "Microsoft", "Edge", "User Data");
     defaultPaths.torch = Path.join(appDataDirectory, "Local", "Torch", "User Data");
-    defaultPaths.seamonkey = Path.join(appDataDirectory, "Roaming", "Mozilla", "SeaMonkey");
+    defaultPaths.seamonkey = Path.join(appDataDirectory, "Roaming", "Mozilla", "SeaMonkey", "User Data");
     defaultPaths.brave = Path.join(appDataDirectory, "Local", "BraveSoftware", "Brave-Browser", "User Data");
     defaultPaths.vivaldi = Path.join(appDataDirectory, "Local", "Vivaldi", "User Data");
     return defaultPaths

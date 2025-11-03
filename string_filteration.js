@@ -72,9 +72,9 @@ function compareStrings(inputString, optionString, url, threshold = 0.3) {
 }
 
 function normalizeText(text) {
+    // Preserve original casing while normalizing punctuation and whitespace.
     return text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remove punctuation
+        .replace(/[^\w\s]/g, '') // Remove punctuation (preserve letters and numbers)
         .replace(/\s+/g, ' ')     // Normalize whitespace
         .trim();
 }
