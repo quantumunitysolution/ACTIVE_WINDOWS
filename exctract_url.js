@@ -107,14 +107,34 @@ function saveResult(data) {
         if (!data) {
             return;
         }
+
+        // Timestamps: set in_time on the incoming log and out_time on the previous log
+        const now = new Date().toISOString();
+        data.in_time = now;
+        // Ensure out_time exists but null until closed
+        data.out_time = null;
+
         // Get today's date as the key
         const today = new Date().toISOString().slice(0, 10);
         const key = `data.${today}`;
 
-        // Get existing data from store
+        // Get existing data from store (synchronous in main process)
         let existingData = store.get(key, []);
 
-        // Append new data
+        // If there is a previous entry without out_time, set its out_time to now
+        if (existingData && existingData.length > 0) {
+            const prev = existingData[existingData.length - 1];
+            if (prev && (prev.out_time === undefined || prev.out_time === null)) {
+                try {
+                    prev.out_time = now;
+                } catch (e) {
+                    // defensive: if prev is immutable for some reason, ignore
+                    console.warn('Could not set prev.out_time', e);
+                }
+            }
+        }
+
+        // Append the new log
         existingData.push(data);
 
         // Save back to store
