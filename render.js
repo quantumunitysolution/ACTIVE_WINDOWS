@@ -386,38 +386,119 @@ function getDomain(url) {
   }
 }
 
+// Calculate time difference in minutes
+function getTimeDiff(inTime, outTime) {
+  return Math.round((new Date(outTime) - new Date(inTime)) / (1000 * 60));
+}
+
+// Format minutes into human readable duration
+function formatDuration(minutes) {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+// Get date filter based on selected timeframe
+function getDateFilter() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  if (document.getElementById('today').checked) {
+    return (date) => date >= today;
+  } else if (document.getElementById('week').checked) {
+    return (date) => date >= weekAgo;
+  } else if (document.getElementById('month').checked) {
+    return (date) => date >= monthAgo;
+  }
+  return () => true; // All time
+}
+
 // Update logs table with current data
 function updateLogsTable() {
   const tbody = document.getElementById('logsTableBody');
   if (!tbody) return;
 
-  logsHistory.reverse();
-  const rows = logsHistory.map((item, index) => {
-    const timestamp = new Date(item.timestamp).toLocaleString();
-    const profile = escapeHtml(item?.profile || item?.profileName || '');
-    const appTitle = escapeHtml(item?.title || item?.owner?.name || '');
+  const dateFilter = getDateFilter();
+  
+  // Group and calculate statistics by domain
+  const domainStats = {};
+  
+  logsHistory.forEach((item, index) => {
     const hist = item?.historyMatches || item?.history || null;
     const url = hist?.url || '';
-    const score = (hist && typeof hist.score !== 'undefined') ? Number(hist.score).toFixed(3) : '';
-    const memoryMB = item?.memoryUsage ? Math.round((item.memoryUsage / (1024*1024)) * 100) / 100 : '';
+    const domain = getDomain(url);
+    if (!domain) return;
+    
+    const timestamp = new Date(item.timestamp);
+    if (!dateFilter(timestamp)) return;
 
-    return `
-      <tr>
-        <td><small>${timestamp}</small></td>
-        <td>${profile}</td>
-        <td>${appTitle}</td>
-        <td>
-          ${url ? `<a href="#" class="external-link" data-href="${escapeAttr(url)}">${escapeHtml(getDomain(url))}</a>` : ''}
-        </td>
-        <td>${score}</td>
-        <td>${memoryMB}</td>
-        <td>
-          ${url ? `<button class="btn btn-sm btn-outline-secondary copy-url" data-url="${escapeAttr(url)}">Copy URL</button>` : ''}
-        </td>
-      </tr>
-    `;
-  }).join('');
+    const inTime = item.in_time ? new Date(item.in_time) : timestamp;
+    const outTime = item.out_time ? new Date(item.out_time) : (
+      // If no out_time, use next entry's in_time or current time
+      index > 0 ? new Date(logsHistory[index - 1].timestamp) : new Date()
+    );
+    
+    const timeSpent = getTimeDiff(inTime, outTime);
+    const memoryMB = item?.memoryUsage ? Math.round((item.memoryUsage / (1024*1024)) * 100) / 100 : 0;
 
+    if (!domainStats[domain]) {
+      domainStats[domain] = {
+        totalTime: 0,
+        visits: 0,
+        lastVisit: timestamp,
+        memoryTotal: 0,
+        memoryCount: 0,
+        url: url // Store one URL for the domain for the external link
+      };
+    }
+
+    domainStats[domain].totalTime += timeSpent;
+    domainStats[domain].visits++;
+    domainStats[domain].lastVisit = new Date(Math.max(domainStats[domain].lastVisit, timestamp));
+    if (memoryMB) {
+      domainStats[domain].memoryTotal += memoryMB;
+      domainStats[domain].memoryCount++;
+    }
+  });
+
+  // Convert to array and sort by total time spent
+  const sortedStats = Object.entries(domainStats)
+    .map(([domain, stats]) => ({
+      domain,
+      ...stats,
+      avgTime: Math.round(stats.totalTime / stats.visits),
+      avgMemory: stats.memoryCount ? Math.round((stats.memoryTotal / stats.memoryCount) * 100) / 100 : 0
+    }))
+    .sort((a, b) => b.totalTime - a.totalTime);
+
+  const rows = sortedStats.map(stats => `
+    <tr>
+      <td>
+        ${stats.url ? 
+          `<a href="#" class="external-link" data-href="${escapeAttr(stats.url)}">${escapeHtml(stats.domain)}</a>` : 
+          escapeHtml(stats.domain)
+        }
+      </td>
+      <td>${formatDuration(stats.totalTime)}</td>
+      <td>${stats.visits}</td>
+      <td><small>${stats.lastVisit.toLocaleString()}</small></td>
+      <td>${formatDuration(stats.avgTime)}</td>
+      <td>${stats.avgMemory} MB</td>
+      <td>
+        ${stats.url ? 
+          `<button class="btn btn-sm btn-outline-secondary copy-url" data-url="${escapeAttr(stats.url)}">Copy URL</button>` : 
+          ''
+        }
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center">No activity data available</td></tr>';
+  tbody.class="external-link";
+  tbody.href="${escapeAttr(url)}";
   tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center">No logs available</td></tr>';
 
   // Wire up event handlers
@@ -486,6 +567,13 @@ document.getElementById('exportLogs')?.addEventListener('click', () => {
   link.href = URL.createObjectURL(blob);
   link.download = `activity_logs_${new Date().toISOString().slice(0,10)}.csv`;
   link.click();
+});
+
+// Add timeframe filter event listeners
+['today', 'week', 'month', 'all'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    updateLogsTable();
+  });
 });
 
 // subscribe to live updates

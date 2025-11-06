@@ -120,11 +120,23 @@
 
     <!-- Logs Section -->
     <div class="card mt-4">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Activity Logs</h5>
-        <div>
-          <button id="clearLogs" class="btn btn-outline-danger btn-sm">Clear Logs</button>
-          <button id="exportLogs" class="btn btn-outline-primary btn-sm ms-2">Export CSV</button>
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Site Activity Summary</h5>
+          <div>
+            <button id="clearLogs" class="btn btn-outline-danger btn-sm">Clear Logs</button>
+            <button id="exportLogs" class="btn btn-outline-primary btn-sm ms-2">Export CSV</button>
+          </div>
+        </div>
+        <div class="btn-group btn-group-sm" role="group">
+          <input type="radio" class="btn-check" name="timeframe" id="today" autocomplete="off" checked>
+          <label class="btn btn-outline-secondary" for="today">Today</label>
+          <input type="radio" class="btn-check" name="timeframe" id="week" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="week">This Week</label>
+          <input type="radio" class="btn-check" name="timeframe" id="month" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="month">This Month</label>
+          <input type="radio" class="btn-check" name="timeframe" id="all" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="all">All Time</label>
         </div>
       </div>
       <div class="card-body">
@@ -132,12 +144,12 @@
           <table class="table table-hover table-striped">
             <thead class="table-light">
               <tr>
-                <th>Timestamp</th>
-                <th>Profile</th>
-                <th>Application</th>
-                <th>URL</th>
-                <th>Match Score</th>
-                <th>Memory (MB)</th>
+                <th>Domain</th>
+                <th>Total Time Spent</th>
+                <th>Visits</th>
+                <th>Last Visit</th>
+                <th>Avg Time/Visit</th>
+                <th>Memory Usage (Avg)</th>
                 <th>Actions</th>
               </tr>
             </thead>
