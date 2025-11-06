@@ -8,8 +8,8 @@ const stringFilter = require("./string_filteration");
 const Store = require('electron-store');
 
 const store = new Store();
-let chromeUserData = path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data");
-let localStatePath = path.join(chromeUserData, "Local State");
+let chromeUserData;
+let localStatePath;
 
 function readHistory(tempPath) {
     return new Promise((resolve) => {

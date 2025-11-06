@@ -8,6 +8,7 @@
   <style>
     body { font-family: sans-serif; padding-top: 18px; }
     /* Chart sizing helpers to keep UI compact */
+    .liveSection { height: fit-content; }
     .chart-card { height: 400px; }
     .chart-card canvas { width: 100% !important; height: 100% !important; }
     .medium-chart { height: 300px !important; }
@@ -22,6 +23,34 @@
       <div>
         <button id="pingBtn" class="btn btn-outline-secondary btn-sm me-2">Ping Main</button>
         <span id="response" class="text-muted small"></span>
+      </div>
+    </div>
+
+    <!-- Activity Summary Section -->
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <div class="card bg-light">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Current Application</h6>
+            <h5 class="card-title mb-0" id="currentAppName">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-light">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Current URL</h6>
+            <h5 class="card-title text-truncate mb-0" id="currentUrl">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-light">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Current Profile</h6>
+            <h5 class="card-title mb-0" id="currentProfileName">-</h5>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -45,25 +74,6 @@
                   <div class="card-body">
                     <h6 class="card-title">Top Domains (distribution)</h6>
                     <canvas id="domainDoughnut" class="small-chart"></canvas>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="card mb-3">
-                  <div class="card-body">
-                    <h6 class="card-title">Average Match Score (per domain)</h6>
-                    <canvas id="avgScoreBar" class="small-chart"></canvas>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="row">
-              <div class="col-12">
-                <div class="card">
-                  <div class="card-body">
-                    <h6 class="card-title">Average Memory Usage (MB by domain)</h6>
-                    <canvas id="memoryBar" class="small-chart"></canvas>
                   </div>
                 </div>
               </div>
@@ -104,6 +114,37 @@
               </table>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="card mt-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Activity Logs</h5>
+        <div>
+          <button id="clearLogs" class="btn btn-outline-danger btn-sm">Clear Logs</button>
+          <button id="exportLogs" class="btn btn-outline-primary btn-sm ms-2">Export CSV</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead class="table-light">
+              <tr>
+                <th>Timestamp</th>
+                <th>Profile</th>
+                <th>Application</th>
+                <th>URL</th>
+                <th>Match Score</th>
+                <th>Memory (MB)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <!-- Logs will be populated here -->
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

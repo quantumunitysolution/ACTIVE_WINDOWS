@@ -41,8 +41,9 @@ function showTab(name) {
 // Live data display: listen for updates from main and request initial data
 let liveChartInstance = null;
 let doughnutInstance = null;
-let scoreChartInstance = null;
-let memoryChartInstance = null;
+// Store logs history
+let logsHistory = [];
+
 function updateLiveDataView(data) {
   const container = document.getElementById('liveList') || (() => {
     const s = document.createElement('div');
@@ -52,9 +53,28 @@ function updateLiveDataView(data) {
   // normalize to array (itemsLatestFirst for table)
   const items = Array.isArray(data) ? data.slice().reverse() : [data]; // show latest first
 
+  // Update summary cards with latest data
+  updateSummaryCards(items[0]);
+
   // update chart and full data list (chart uses chronological order)
   renderChart(items.slice().reverse());
   renderAdditionalCharts(items.slice().reverse());
+
+  // Update logs
+  if (!Array.isArray(data)) {
+    // Single item update, add to history
+    logsHistory.unshift({
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    // Bulk update, replace history
+    logsHistory = data.map(item => ({
+      ...item,
+      timestamp: new Date().toISOString()
+    }));
+  }
+  updateLogsTable();
 
   const tbody = document.getElementById('liveTableBody');
   if (!tbody) return;
@@ -255,7 +275,7 @@ function renderChart(items) {
   }
 }
 
-// Render additional charts: domain distribution (doughnut), avg score per domain, avg memory per domain
+// Render additional charts: domain distribution (doughnut)
 function renderAdditionalCharts(items) {
   // chronological items (oldest -> newest)
   const domains = items.map(it => {
@@ -266,28 +286,8 @@ function renderAdditionalCharts(items) {
 
   // totals per domain
   const totals = {};
-  const scoreAcc = {};
-  const scoreCount = {};
-  const memAcc = {};
-  const memCount = {};
-
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const d = domains[i];
+  for (const d of domains) {
     totals[d] = (totals[d] || 0) + 1;
-
-    const hist = it?.historyMatches || it?.history || null;
-    const s = (hist && typeof hist.score !== 'undefined') ? Number(hist.score) : NaN;
-    if (!Number.isNaN(s)) {
-      scoreAcc[d] = (scoreAcc[d] || 0) + s;
-      scoreCount[d] = (scoreCount[d] || 0) + 1;
-    }
-
-    const mem = it?.memoryUsage ? (it.memoryUsage / (1024*1024)) : NaN; // MB
-    if (!Number.isNaN(mem)) {
-      memAcc[d] = (memAcc[d] || 0) + mem;
-      memCount[d] = (memCount[d] || 0) + 1;
-    }
   }
 
   // pick top domains by total
@@ -314,53 +314,6 @@ function renderAdditionalCharts(items) {
       } catch (err) { console.warn('doughnut create failed', err); }
     }
   }
-
-  // Avg score per domain (bar)
-  const scoreLabels = labels;
-  const avgScores = labels.map(l => {
-    const a = scoreAcc[l] || 0;
-    const c = scoreCount[l] || 0;
-    return c ? (a / c) : 0;
-  });
-  const scoreCtx = document.getElementById('avgScoreBar')?.getContext('2d');
-  if (scoreCtx) {
-    if (scoreChartInstance) {
-      scoreChartInstance.data.labels = scoreLabels;
-      scoreChartInstance.data.datasets[0].data = avgScores;
-      scoreChartInstance.update();
-    } else {
-      try {
-        scoreChartInstance = new Chart(scoreCtx, {
-          type: 'bar',
-          data: { labels: scoreLabels, datasets: [{ label: 'Avg score', data: avgScores, backgroundColor: 'rgba(255,99,132,0.6)' }] },
-          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
-        });
-      } catch (err) { console.warn('score chart failed', err); }
-    }
-  }
-
-  // Avg memory per domain (bar)
-  const memVals = labels.map(l => {
-    const a = memAcc[l] || 0;
-    const c = memCount[l] || 0;
-    return c ? Math.round((a / c) * 100) / 100 : 0;
-  });
-  const memCtx = document.getElementById('memoryBar')?.getContext('2d');
-  if (memCtx) {
-    if (memoryChartInstance) {
-      memoryChartInstance.data.labels = labels;
-      memoryChartInstance.data.datasets[0].data = memVals;
-      memoryChartInstance.update();
-    } else {
-      try {
-        memoryChartInstance = new Chart(memCtx, {
-          type: 'bar',
-          data: { labels: labels, datasets: [{ label: 'Avg memory (MB)', data: memVals, backgroundColor: 'rgba(54,162,235,0.6)' }] },
-          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
-        });
-      } catch (err) { console.warn('memory chart failed', err); }
-    }
-  }
 }
 
 function escapeHtml(str) {
@@ -377,6 +330,50 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, '&quot;');
 }
 
+// Update the summary cards at the top of the dashboard
+function updateSummaryCards(item) {
+  const appNameEl = document.getElementById('currentAppName');
+  const urlEl = document.getElementById('currentUrl');
+  const profileEl = document.getElementById('currentProfileName');
+
+  if (!item) {
+    if (appNameEl) appNameEl.textContent = '-';
+    if (urlEl) urlEl.textContent = '-';
+    if (profileEl) profileEl.textContent = '-';
+    return;
+  }
+
+  // Update application name
+  if (appNameEl) {
+    const appName = item?.title || item?.owner?.name || '-';
+    appNameEl.textContent = appName;
+  }
+
+  // Update URL
+  if (urlEl) {
+    const hist = item?.historyMatches || item?.history || null;
+    const url = hist?.url || '-';
+    urlEl.textContent = url;
+    urlEl.title = url; // For full URL on hover
+    if (url !== '-') {
+      urlEl.style.cursor = 'pointer';
+      urlEl.onclick = () => {
+        if (window.electronAPI && window.electronAPI.openExternal) {
+          window.electronAPI.openExternal(url);
+        } else {
+          window.open(url, '_blank');
+        }
+      };
+    }
+  }
+
+  // Update profile name
+  if (profileEl) {
+    const profileName = item?.profile || item?.profileName || '-';
+    profileEl.textContent = profileName;
+  }
+}
+
 function getDomain(url) {
   if (!url) return '';
   try {
@@ -388,6 +385,108 @@ function getDomain(url) {
     return '';
   }
 }
+
+// Update logs table with current data
+function updateLogsTable() {
+  const tbody = document.getElementById('logsTableBody');
+  if (!tbody) return;
+
+  logsHistory.reverse();
+  const rows = logsHistory.map((item, index) => {
+    const timestamp = new Date(item.timestamp).toLocaleString();
+    const profile = escapeHtml(item?.profile || item?.profileName || '');
+    const appTitle = escapeHtml(item?.title || item?.owner?.name || '');
+    const hist = item?.historyMatches || item?.history || null;
+    const url = hist?.url || '';
+    const score = (hist && typeof hist.score !== 'undefined') ? Number(hist.score).toFixed(3) : '';
+    const memoryMB = item?.memoryUsage ? Math.round((item.memoryUsage / (1024*1024)) * 100) / 100 : '';
+
+    return `
+      <tr>
+        <td><small>${timestamp}</small></td>
+        <td>${profile}</td>
+        <td>${appTitle}</td>
+        <td>
+          ${url ? `<a href="#" class="external-link" data-href="${escapeAttr(url)}">${escapeHtml(getDomain(url))}</a>` : ''}
+        </td>
+        <td>${score}</td>
+        <td>${memoryMB}</td>
+        <td>
+          ${url ? `<button class="btn btn-sm btn-outline-secondary copy-url" data-url="${escapeAttr(url)}">Copy URL</button>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center">No logs available</td></tr>';
+
+  // Wire up event handlers
+  tbody.querySelectorAll('.external-link').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const url = a.dataset.href;
+      if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    });
+  });
+
+  tbody.querySelectorAll('.copy-url').forEach(button => {
+    button.addEventListener('click', async () => {
+      const url = button.dataset.url;
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = 'Copied!';
+        setTimeout(() => button.textContent = 'Copy URL', 1500);
+      } catch (err) {
+        console.warn('Copy failed', err);
+      }
+    });
+  });
+}
+
+// Handle clear logs button
+document.getElementById('clearLogs')?.addEventListener('click', () => {
+  if (confirm('Are you sure you want to clear all logs?')) {
+    logsHistory = [];
+    updateLogsTable();
+  }
+});
+
+// Handle export logs button
+document.getElementById('exportLogs')?.addEventListener('click', () => {
+  const csv = [
+    ['Timestamp', 'Profile', 'Application', 'Domain', 'URL', 'Match Score', 'Memory (MB)'].join(','),
+    ...logsHistory.map(item => {
+      const timestamp = new Date(item.timestamp).toLocaleString();
+      const profile = item?.profile || item?.profileName || '';
+      const appTitle = item?.title || item?.owner?.name || '';
+      const hist = item?.historyMatches || item?.history || null;
+      const url = hist?.url || '';
+      const domain = getDomain(url);
+      const score = (hist && typeof hist.score !== 'undefined') ? Number(hist.score).toFixed(3) : '';
+      const memoryMB = item?.memoryUsage ? Math.round((item.memoryUsage / (1024*1024)) * 100) / 100 : '';
+      
+      return [
+        timestamp,
+        profile,
+        appTitle,
+        domain,
+        url,
+        score,
+        memoryMB
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+    })
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `activity_logs_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+});
 
 // subscribe to live updates
 if (window.electronAPI && window.electronAPI.onLiveData) {

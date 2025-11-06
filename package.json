@@ -1,16 +1,11 @@
 {
   "type": "commonjs",
-  "dependencies": {
-    "active-win": "^8.2.1",
-    "better-sqlite3": "^11.10.0",
-    "electron-store": "^8.2.0",
-    "ws": "^8.18.3"
-  },
   "name": "active_url",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "build": "electron-builder",
     "dist:win": "electron-builder --win",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -40,9 +35,15 @@
     }
   },
   "author": "",
+  "dependencies": {
+    "active-win": "^8.2.1",
+    "better-sqlite3": "^11.10.0",
+    "electron-store": "^8.2.0"
+  },
   "devDependencies": {
     "electron": "^23.3.13",
-    "electron-builder": "^23.6.0"
+    "electron-builder": "^23.6.0",
+    "electron-rebuild": "^3.2.9"
   },
   "license": "ISC",
   "description": ""
